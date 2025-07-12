@@ -199,7 +199,6 @@ DWORD WINAPI PeLoaderThread(LPVOID param) {
         return 1;
     }
 
-    printf("[+] Waiting for loader thread to finish\n");
     WaitForSingleObject(hThread, INFINITE);
 
     return 0;
